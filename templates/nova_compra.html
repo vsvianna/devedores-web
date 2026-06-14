@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<h2 class="mb-4">🛒 Registrar Compra</h2>
+
+<div class="card">
+    <div class="card-body">
+
+        <form method="POST">
+
+            <div class="mb-3">
+                <label class="form-label">Cliente</label>
+
+                <select
+                    name="cliente_id"
+                    class="form-select"
+                    required>
+
+                    {% for cliente in clientes %}
+                        <option value="{{ cliente[0] }}">
+                            {{ cliente[1] }}
+                        </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Data da Compra</label>
+
+                <input
+                    type="date"
+                    name="data_compra"
+                    class="form-control"
+                    required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Valor</label>
+
+                <input
+                    type="number"
+                    step="0.01"
+                    name="valor"
+                    class="form-control"
+                    required>
+            </div>
+
+            <button type="submit" class="btn btn-success">
+                💾 Salvar Compra
+            </button>
+
+            <a href="/" class="btn btn-secondary">
+                Cancelar
+            </a>
+
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}

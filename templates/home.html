@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<h2 class="mb-4">📊 Dashboard</h2>
+
+<div class="row">
+
+    <div class="col-md-3">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h5>👥 Clientes</h5>
+                <h2>{{ total_clientes }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h5>💰 Total em Aberto</h5>
+                <h2>R$ {{ total_receber }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h5>🛒 Compras Abertas</h5>
+                <h2>{{ compras_abertas }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+    <div class="card shadow-sm">
+        <div class="card-body text-center">
+            <h5>📅 Vendas do Mês</h5>
+            <h2>R$ {{ "%.2f"|format(vendas_mes) }}</h2>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

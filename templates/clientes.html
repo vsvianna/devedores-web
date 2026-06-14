@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<h2 class="mb-4">👥 Clientes</h2>
+
+<form method="GET" class="row g-3 mb-4">
+
+    <div class="col-md-6">
+        <input
+            type="text"
+            class="form-control"
+            name="busca"
+            placeholder="Pesquisar cliente pelo nome">
+    </div>
+
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">
+            🔍 Buscar
+        </button>
+    </div>
+
+</form>
+
+<table class="table table-striped table-hover table-bordered align-middle">
+
+    <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>Total em Aberto</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+    {% for cliente in clientes %}
+
+    <tr>
+
+        <td>{{ cliente[0] }}</td>
+        <td>{{ cliente[1] }}</td>
+        <td>{{ cliente[2] }}</td>
+        <td>R$ {{ cliente[3] }}</td>
+
+        <td>
+
+            <a href="/cliente/{{ cliente[0] }}"
+               class="btn btn-info btn-sm">
+                Ver
+            </a>
+
+            <a href="/editar_cliente/{{ cliente[0] }}"
+               class="btn btn-warning btn-sm">
+                Editar
+            </a>
+
+            <a href="/excluir_cliente/{{ cliente[0] }}"
+               class="btn btn-danger btn-sm"
+               onclick="return confirm('Deseja realmente excluir este cliente?')">
+                Excluir
+            </a>
+
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+    </tbody>
+
+</table>
+
+<a href="/" class="btn btn-secondary">
+    ⬅ Voltar ao início
+</a>
+
+{% endblock %}

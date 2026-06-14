@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<h2 class="mb-4">📊 Relatórios</h2>
+<a href="/relatorio_mensal_pdf?mes=6&ano=2026"
+   class="btn btn-danger">
+    📄 Baixar PDF
+</a>
+
+<div class="card p-4">
+
+    <h4>📅 Relatório Mensal</h4>
+
+    <form action="/relatorio_mensal" method="GET">
+
+        <div class="row">
+
+            <div class="col-md-3">
+                <input
+                    type="number"
+                    name="mes"
+                    min="1"
+                    max="12"
+                    placeholder="Mês"
+                    class="form-control"
+                    required>
+            </div>
+
+            <div class="col-md-3">
+                <input
+                    type="number"
+                    name="ano"
+                    placeholder="Ano"
+                    class="form-control"
+                    required>
+            </div>
+
+            <div class="col-md-3">
+                <button class="btn btn-primary">
+                    Gerar
+                </button>
+            </div>
+
+        </div>
+
+    </form>
+
+    <hr>
+
+    <h4>📆 Relatório Anual</h4>
+
+    <form action="/relatorio_anual" method="GET">
+
+        <div class="row">
+
+            <div class="col-md-3">
+                <input
+                    type="number"
+                    name="ano"
+                    class="form-control"
+                    placeholder="Ano"
+                    required>
+            </div>
+
+            <div class="col-md-3">
+                <button class="btn btn-success">
+                    Gerar
+                </button>
+            </div>
+
+        </div>
+
+    </form>
+
+    <hr>
+
+    <h4>👤 Relatório por Cliente</h4>
+
+    <form action="/relatorio_cliente" method="GET">
+
+        <div class="row">
+
+            <div class="col-md-4">
+
+                <select
+                    name="cliente_id"
+                    class="form-select"
+                    required>
+
+                    {% for cliente in clientes %}
+
+                    <option value="{{ cliente[0] }}">
+                        {{ cliente[1] }}
+                    </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="col-md-3">
+                <button class="btn btn-warning">
+                    Gerar
+                </button>
+            </div>
+
+        </div>
+
+    </form>
+
+</div>
+
+{% endblock %}
