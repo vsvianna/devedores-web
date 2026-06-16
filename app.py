@@ -1,12 +1,15 @@
-from flask import Flask,render_template,redirect,request, send_file
+from flask import Flask,render_template,redirect,request, send_file,session
 from datetime import date
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
+from werkzeug.security import generate_password_hash,check_password_hash
 
 app=Flask(__name__)
 @app.route("/")
 def home():
+    if "usuario_id" not in session:
+        return redirect("/login")
     import sqlite3
 
     conn = sqlite3.connect("banco.db")
@@ -62,17 +65,16 @@ def novo_cliente():
         import sqlite3
         conn=sqlite3.connect("banco.db")
         cursor=conn.cursor()
-        cursor.execute(
-           """
-           INSERT INTO clientes
-           (nome,telefone)
-           VALUES(?, ?)
-           """,
-           (nome,telefone)
-        )
+        usuario_id = session["usuario_id"]
+
+        cursor.execute("""
+            INSERT INTO clientes
+            (nome, telefone, usuario_id)
+            VALUES (?, ?, ?)
+            """, (nome, telefone, usuario_id))
         conn.commit()
         conn.close()
-        return redirect ("/")
+        return redirect ("/clientes")
     return render_template ("novo_cliente.html")
 
 @app.route("/clientes")
@@ -81,11 +83,13 @@ def clientes():
     import sqlite3
     conn=sqlite3.connect("banco.db")
     cursor=conn.cursor()
+    usuario_id=session["usuario_id"]
     cursor.execute("""
         SELECT*
         FROM clientes
-        WHERE nome LIKE ?
-    """,(f"%{busca}",))
+        WHERE usuario_id=?
+        AND nome LIKE ?
+        """,(usuario_id,f"%{busca}%"))
     clientes=cursor.fetchall()
     clientes_com_total=[]
     for cliente in clientes:
@@ -103,6 +107,15 @@ def clientes():
         clientes_com_total.append(
             (cliente[0],cliente[1],cliente[2],total)
         )
+    conn.close()
+    conn = sqlite3.connect("banco.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        ALTER TABLE clientes
+        ADD COLUMN usuario_id INTEGER
+        """)
+
+    conn.commit()
     conn.close()
     return render_template(
         "clientes.html",
@@ -376,6 +389,81 @@ def relatorio_mensal_pdf():
         download_name=f"relatorio_{mes}_{ano}.pdf",
         mimetype="application/pdf"
     )
+
+import sqlite3
+def criar_tabela_usuario():
+    conn=sqlite3.connect("banco.db")
+    cursor=conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS usuarios(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            senha TEXT NOT NULL
+            )     
+        """)
+    conn.commit()
+    conn.close()
+criar_tabela_usuario()
+
+@app.route("/cadastro", methods=["GET","POST"])
+def cadastro():
+    import sqlite3
+    if request.method=="POST":
+        email=request.form["email"]
+        senha=request.form["senha"]
+
+        senha_hash=generate_password_hash(senha)
+        conn=sqlite3.connect("banco.db")
+        cursor=conn.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO usuarios (email,senha)
+                VALUES (?,?)
+            """,(email,senha_hash))
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.close()
+            return "Este e-mail ja esta cadastro",
+            ("cadastro.html")
+        conn.close()
+        return redirect("/login")
+    return render_template("cadastro.html")
+
+@app.route("/login",methods=["GET","POST"])
+def login():
+    import sqlite3
+    if "usuario_id" in session:
+        return redirect("/")
+    if request.method=="POST":
+        email=request.form["email"]
+        senha=request.form["senha"]
+
+        conn=sqlite3.connect("banco.db")
+        cursor=conn.cursor()
+        cursor.execute("""
+            SELECT id, senha
+            FROM usuarios
+            WHERE email= ?
+        """,(email,))
+        usuario=cursor.fetchone()
+        conn.close()
+
+        if usuario is not None:
+            id_usuario=usuario[0]
+            senha_hash=usuario[1]
+
+            if check_password_hash(senha_hash,senha):
+                session["usuario_id"]=id_usuario
+                return redirect("/")
+        return "E-mail ou senha invalida."
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 if (__name__) == "__main__":
     app.run(debug=True)

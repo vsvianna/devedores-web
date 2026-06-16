@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block conteudo %}
+
+<div class="container mt-5" style="max-width:500px;">
+    <div class="card shadow p-4">
+        <h2 class="text-center mb-4">
+            Criar Conta
+        </h2>
+        <form method ="POST">
+            <div class ="mb-3">
+                <label>E-mail</label>
+                <input
+                    type="email"
+                    name="email"
+                    class="form-control"
+                    required>
+            </div>
+
+            <div class="mb3">
+                <label>Senha</label>
+                <input
+                    type="password"
+                    name="senha"
+                    class="form-control"
+                    required>
+            </div>
+            <label></label>
+            <button class="btn btn-success w-100">
+                Criar Conta
+            </button>
+            <label></label>
+            <button class="btn btn-success w-100">
+                <a class="nav-link" href="/login"> Voltar </a>
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
