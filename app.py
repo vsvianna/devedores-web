@@ -6,6 +6,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from werkzeug.security import generate_password_hash,check_password_hash
 
 app=Flask(__name__)
+import secrets
+print(secrets.token_hex(32))
+app.secret_key="8f739ca31886ade82396209d0d34b05f2498e8e5e703343414d195eb2c381d90"
+
 @app.route("/")
 def home():
     if "usuario_id" not in session:
@@ -14,22 +18,52 @@ def home():
 
     conn = sqlite3.connect("banco.db")
     cursor = conn.cursor()
-
-    cursor.execute("SELECT COUNT(*) FROM clientes")
+    usuario_id=session["usuario_id"]
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM clientes
+        WHERE usuario_id=?       
+        """,(usuario_id,))
     total_clientes = cursor.fetchone()[0]
 
     cursor.execute("""
-        SELECT COUNT(*)
-        FROM compras
-        WHERE status = 'ABERTA'
-    """)
-    compras_abertas = cursor.fetchone()[0]
+    SELECT SUM(valor)
+    FROM compras
+    WHERE status='ABERTA'
+    AND cliente_id IN(
+        SELECT id
+        FROM clientes
+        WHERE usuario_id=?
+    )
+    """,(usuario_id,))
+
+    compras_abertas=cursor.fetchone()[0]
+    if compras_abertas is None:
+        compras_abertas=0
+
+    cursor.execute("""
+    SELECT COUNT(*)
+    FROM compras
+    WHERE status='PAGA'
+    AND cliente_id IN(
+        SELECT id
+        FROM clientes
+        WHERE usuario_id=?
+    )
+    """,(usuario_id,))
+
+    pagas = cursor.fetchone()[0]
 
     cursor.execute("""
         SELECT SUM(valor)
         FROM compras
-        WHERE status = 'ABERTA'
-    """)
+        WHERE status='ABERTA'
+        AND cliente_id IN(
+            SELECT id
+            FROM clientes
+            WHERE usuario_id=?
+    )
+    """,(usuario_id,))
     total_receber = cursor.fetchone()[0]
 
     if total_receber is None:
@@ -41,19 +75,89 @@ def home():
         SELECT SUM(valor)
         FROM compras
         WHERE data_compra LIKE ?
-    """,(f"{mes_atual}%",))
+        AND cliente_id IN(
+            SELECT id
+            FROM clientes
+            WHERE usuario_id=?
+        )
+    """,(f"{mes_atual}%",usuario_id))
 
     vendas_mes=cursor.fetchone()[0]
     if vendas_mes is None:
         vendas_mes=0
+
+    from datetime import datetime
+    cursor.execute("""
+        SELECT                  
+            substr(data_compra,1,7) as mes,    
+            SUM(valor)
+        FROM compras          
+        WHERE cliente_id IN(
+            SELECT id
+            FROM clientes
+            WHERE usuario_id=?
+        )
+        GROUP BY substr(data_compra,1,7)
+        ORDER BY mes
+    """,(usuario_id,))
+    resultado=cursor.fetchall()
+
+    meses = []
+    valores = []
+
+    for linha in resultado:
+        data_mes = datetime.strptime(linha[0], "%Y-%m")
+        meses.append(
+        data_mes.strftime("%b/%y")
+        )
+        valores.append(float(linha[1]))
+    meses = meses[-6:]
+    valores = valores[-6:]
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM compras
+        WHERE status='PAGA'
+        AND cliente_id IN(
+            SELECT id
+            FROM clientes
+            WHERE usuario_id=?
+    )
+    """,(usuario_id,))
+
+    pagas=cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT
+            clientes.nome,
+            SUM(compras.valor) as total_divida              
+        FROM clientes
+        JOIN compras
+            ON clientes.id=compras.cliente_id
+        WHERE clientes.usuario_id=?
+        AND compras.status='ABERTA'
+        GROUP BY clientes.id, clientes.nome
+        ORDER BY total_divida DESC
+        LIMIT 5 
+    """,(usuario_id,))
+    top_devedores=cursor.fetchall()
+
     conn.close()
+
+    print("compras_abertas =", compras_abertas)
+    print("total_receber =", total_receber)
+    print("pagas =", pagas)
 
     return render_template(
         "home.html",
         total_clientes=total_clientes,
         compras_abertas=compras_abertas,
         total_receber=total_receber,
-        vendas_mes=vendas_mes
+        vendas_mes=vendas_mes,
+        meses=meses,
+        valores=valores,
+        pagas=pagas,
+        top_devedores=top_devedores
     )
 
 @app.route("/novo_cliente",methods=["GET","POST"])
@@ -107,14 +211,6 @@ def clientes():
         clientes_com_total.append(
             (cliente[0],cliente[1],cliente[2],total)
         )
-    conn.close()
-    conn = sqlite3.connect("banco.db")
-    cursor = conn.cursor()
-    cursor.execute("""
-        ALTER TABLE clientes
-        ADD COLUMN usuario_id INTEGER
-        """)
-
     conn.commit()
     conn.close()
     return render_template(
@@ -125,13 +221,20 @@ def clientes():
 @app.route("/nova_compra", methods=["GET", "POST"])
 def nova_compra():
 
+    usuario_id = session["usuario_id"]
+
     import sqlite3
 
     conn = sqlite3.connect("banco.db")
     cursor = conn.cursor()
+    if "usuario_id" not in session:
+        return redirect("/login")
 
-    # Buscar clientes para preencher o <select>
-    cursor.execute("SELECT id, nome FROM clientes")
+    cursor.execute("""
+        SELECT id, nome
+        FROM clientes
+        WHERE usuario_id = ?
+    """, (usuario_id,))
     clientes = cursor.fetchall()
 
     if request.method == "POST":
@@ -141,10 +244,28 @@ def nova_compra():
         valor = request.form["valor"]
 
         cursor.execute("""
+            SELECT id
+            FROM clientes
+            WHERE id = ?
+            AND usuario_id = ?
+        """, (cliente_id, usuario_id))
+
+        cliente = cursor.fetchone()
+
+        if cliente is None:
+            conn.close()
+            return "Cliente inválido."
+
+        cursor.execute("""
             INSERT INTO compras
             (cliente_id, data_compra, valor, status)
             VALUES (?, ?, ?, ?)
-        """, (cliente_id, data_compra, valor, "ABERTA"))
+        """, (
+            cliente_id,
+            data_compra,
+            valor,
+            "ABERTA"
+        ))
 
         conn.commit()
         conn.close()
@@ -152,6 +273,7 @@ def nova_compra():
         return redirect("/")
 
     conn.close()
+
     return render_template(
         "nova_compra.html",
         clientes=clientes
@@ -159,34 +281,49 @@ def nova_compra():
 
 @app.route("/excluir_cliente/<int:id>")
 def excluir_cliente(id):
+    usuario_id=session["usuario_id"]
+    if "usuario_id" not in session:
+        return redirect("/login")
     import sqlite3
     conn=sqlite3.connect("banco.db")
     cursor=conn.cursor()
-    cursor.execute(
-        "DELETE FROM clientes WHERE id = ?",
-        (id,)
-    )
+    cursor.execute("""
+        DELETE FROM clientes 
+        WHERE id = ?
+        AND usuario_id=?
+    """,(id,usuario_id))
     conn.commit()
     conn.close()
     return redirect("/clientes")
 
 @app.route("/cliente/<int:id>")
 def detalhes_cliente(id):
+    if "usuario_id" not in session:
+        return redirect("/login")
     import sqlite3
     conn=sqlite3.connect("banco.db")
     cursor=conn.cursor()
-    cursor.execute(
-        "SELECT*FROM clientes WHERE id = ?",
-        (id,)
-    )
+    usuario_id=session["usuario_id"]
+    cursor.execute("""
+        SELECT*
+        FROM clientes
+        WHERE id = ?
+        AND usuario_id=?
+    """,(id,usuario_id))
+    
     cliente=cursor.fetchone()
-    cursor.execute(
-        "SELECT*FROM compras WHERE cliente_id = ?",
-        (id,)
-    )
+    if cliente is None:
+        conn.close()
+        return "Cliente não encontrado."
 
+    cursor.execute("""
+        SELECT*
+        FROM compras
+        WHERE cliente_id = ?
+    """,(id,))
+    
     compras=cursor.fetchall()
-    conn.close
+    conn.close()
     return render_template(
         "detalhes_cliente.html",
         cliente=cliente,
@@ -195,19 +332,39 @@ def detalhes_cliente(id):
 
 @app.route("/pagar/<int:compra_id>")
 def pagar(compra_id):
+
     import sqlite3
-    conn=sqlite3.connect("banco.db")
-    cursor=conn.cursor()
+
+    conn = sqlite3.connect("banco.db")
+    cursor = conn.cursor()
+
+    usuario_id = session["usuario_id"]
+
+    cursor.execute("""
+        SELECT compras.id
+        FROM compras
+        JOIN clientes
+        ON compras.cliente_id = clientes.id
+        WHERE compras.id = ?
+        AND clientes.usuario_id = ?
+    """,(compra_id, usuario_id))
+
+    compra = cursor.fetchone()
+
+    if compra is None:
+        conn.close()
+        return "Compra não encontrada."
 
     cursor.execute("""
         UPDATE compras
-        SET status =?, data_pagamento=?
-        WHERE id=?
-    """,(
+        SET status = ?, data_pagamento = ?
+        WHERE id = ?
+    """, (
         "PAGA",
         date.today().isoformat(),
         compra_id
     ))
+
     conn.commit()
     conn.close()
 
@@ -215,27 +372,37 @@ def pagar(compra_id):
 
 @app.route("/editar_cliente/<int:id>", methods=["GET","POST"])
 def editar_cliente(id):
+    if "usuario_id" not in session:
+        return redirect ("/login")
     import sqlite3
     conn=sqlite3.connect("banco.db")
     cursor=conn.cursor()
+    usuario_id=session["usuario_id"]
     if request.method == "POST":
         nome=request.form["nome"]
         telefone=request.form["telefone"]
 
         cursor.execute("""
             UPDATE clientes
-            SET nome = ?, telefone= ?,
+            SET nome = ?, telefone= ?
             WHERE id= ?
-        """,(nome,telefone,id))
+            AND usuario_id=?
+        """,(nome,telefone,id,usuario_id))
         conn.commit()
         conn.close()
         return redirect("/clientes")
-    cursor.execute(
-        "SELECT*FROM clientes WHERE id = ?",
-        (id,)
-    )
+    cursor.execute("""
+        SELECT*
+        FROM clientes
+        WHERE id = ?
+        AND usuario_id=?
+    """,(id,usuario_id))
+
     cliente=cursor.fetchone()
     conn.close()
+
+    if cliente is None:
+        return "Cliente não encontrado."
     return render_template(
         "editar_cliente.html",
         cliente=cliente
@@ -411,6 +578,7 @@ criar_tabela_usuario()
 def cadastro():
     import sqlite3
     if request.method=="POST":
+        nome=request.form["nome"]
         email=request.form["email"]
         senha=request.form["senha"]
 
@@ -419,14 +587,13 @@ def cadastro():
         cursor=conn.cursor()
         try:
             cursor.execute("""
-                INSERT INTO usuarios (email,senha)
-                VALUES (?,?)
-            """,(email,senha_hash))
+                INSERT INTO usuarios (nome,email,senha)
+                VALUES (?,?,?)
+            """,(nome,email,senha_hash))
             conn.commit()
         except sqlite3.IntegrityError:
             conn.close()
             return "Este e-mail ja esta cadastro",
-            ("cadastro.html")
         conn.close()
         return redirect("/login")
     return render_template("cadastro.html")

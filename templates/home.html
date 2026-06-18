@@ -42,4 +42,88 @@
     </div>
 </div>
 
+<div class="card shadow-sm mt-4">
+    <div class="card-body">
+        <h4>Venda dos Últimos 6 Meses</h4>
+        <canvas id="graficoVendas"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const ctx=document.getElementById('graficoVendas');
+new Chart(ctx,{
+    type: 'bar',
+    data: {
+        labels:{{ meses | tojson }},
+        datasets:[{
+            label:'Vendas (R$)',
+            data:{{ valores | tojson }}
+        }]
+    },
+    options:{
+        responsive:true,
+        plugin:{
+            legend:{
+                display:true
+            }
+        }
+    }
+});
+</script>
+<canvas id="graficoVendas"></canvas>
+<div class="card shadow-sm mt-2">
+    <div class="card-body">
+        <h4>Compras Abertas x Pagas</h4>
+        <canvas id="graficoStatus"></canvas>
+    </div>
+</div>
+<script>
+
+const ctxPizza = document.getElementById('graficoStatus');
+
+new Chart(ctxPizza,{
+    type:'pie',
+    data:{
+        labels:['Abertas','Pagas'],
+        datasets:[{
+            data:[
+                {{ abertas }},
+                {{ pagas }}
+            ]
+        }]
+    }
+});
+</script>
+
+<div class="card shadow-sm mt-4">
+    <div class="card-body">
+
+        <h4>🏆 Top 5 Clientes Devedores</h4>
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Dívida</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for cliente in top_devedores %}
+                <tr>
+                    <td>{{ cliente[0] }}</td>
+                    <td>R$ {{ "%.2f"|format(cliente[1]) }}</td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+
 {% endblock %}
