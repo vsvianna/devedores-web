@@ -6,7 +6,7 @@
 
 <div class="row">
 
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-lg-3 mb-3">
         <div class="card shadow-sm">
             <div class="card-body text-center">
                 <h5>👥 Clientes</h5>
@@ -15,7 +15,7 @@
         </div>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-lg-3 mb-3">
         <div class="card shadow-sm">
             <div class="card-body text-center">
                 <h5>💰 Total em Aberto</h5>
@@ -24,7 +24,7 @@
         </div>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-lg-3 mb-3">
         <div class="card shadow-sm">
             <div class="card-body text-center">
                 <h5>🛒 Compras Abertas</h5>
@@ -33,7 +33,7 @@
         </div>
     </div>
 
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-lg-3 mb-3">
     <div class="card shadow-sm">
         <div class="card-body text-center">
             <h5>📅 Vendas do Mês</h5>
@@ -101,27 +101,26 @@ new Chart(ctxPizza,{
     <div class="card-body">
 
         <h4>🏆 Top 5 Clientes Devedores</h4>
+            <div class="table-responsive">    
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                        <th>Cliente</th>
+                        <th>Dívida</th>
+                        </tr>
+                    </thead>
 
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Cliente</th>
-                    <th>Dívida</th>
-                </tr>
-            </thead>
+                    <tbody>
 
-            <tbody>
-
-                {% for cliente in top_devedores %}
-                <tr>
+                    {% for cliente in top_devedores %}
+                    <tr>
                     <td>{{ cliente[0] }}</td>
                     <td>R$ {{ "%.2f"|format(cliente[1]) }}</td>
-                </tr>
-                {% endfor %}
-
-            </tbody>
-        </table>
-
+                    </tr>
+                    {% endfor %}       
+                    </tbody>
+                </table>
+            </div>
     </div>
 </div>
 

@@ -14,15 +14,14 @@ app.secret_key="8f739ca31886ade82396209d0d34b05f2498e8e5e703343414d195eb2c381d90
 def home():
     if "usuario_id" not in session:
         return redirect("/login")
-    import sqlite3
-
-    conn = sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor = conn.cursor()
     usuario_id=session["usuario_id"]
     cursor.execute("""
         SELECT COUNT(*)
         FROM clientes
-        WHERE usuario_id=?       
+        WHERE usuario_id=%s       
         """,(usuario_id,))
     total_clientes = cursor.fetchone()[0]
 
@@ -33,7 +32,7 @@ def home():
     AND cliente_id IN(
         SELECT id
         FROM clientes
-        WHERE usuario_id=?
+        WHERE usuario_id=%s
     )
     """,(usuario_id,))
 
@@ -48,7 +47,7 @@ def home():
     AND cliente_id IN(
         SELECT id
         FROM clientes
-        WHERE usuario_id=?
+        WHERE usuario_id=%s
     )
     """,(usuario_id,))
 
@@ -61,7 +60,7 @@ def home():
         AND cliente_id IN(
             SELECT id
             FROM clientes
-            WHERE usuario_id=?
+            WHERE usuario_id=%s
     )
     """,(usuario_id,))
     total_receber = cursor.fetchone()[0]
@@ -74,13 +73,13 @@ def home():
     cursor.execute("""
         SELECT SUM(valor)
         FROM compras
-        WHERE data_compra LIKE ?
+        WHERE TO_CHAR(data_compra,'YYYY-MM')=%s
         AND cliente_id IN(
             SELECT id
             FROM clientes
-            WHERE usuario_id=?
+            WHERE usuario_id=%s
         )
-    """,(f"{mes_atual}%",usuario_id))
+    """,(mes_atual,usuario_id))
 
     vendas_mes=cursor.fetchone()[0]
     if vendas_mes is None:
@@ -89,15 +88,15 @@ def home():
     from datetime import datetime
     cursor.execute("""
         SELECT                  
-            substr(data_compra,1,7) as mes,    
+            TO_CHAR(data_compra,'YYYY-MM') as mes,    
             SUM(valor)
         FROM compras          
         WHERE cliente_id IN(
             SELECT id
             FROM clientes
-            WHERE usuario_id=?
+            WHERE usuario_id=%s
         )
-        GROUP BY substr(data_compra,1,7)
+        GROUP BY TO_CHAR(data_compra,'YYYY-MM')
         ORDER BY mes
     """,(usuario_id,))
     resultado=cursor.fetchall()
@@ -121,7 +120,7 @@ def home():
         AND cliente_id IN(
             SELECT id
             FROM clientes
-            WHERE usuario_id=?
+            WHERE usuario_id=%s
     )
     """,(usuario_id,))
 
@@ -134,7 +133,7 @@ def home():
         FROM clientes
         JOIN compras
             ON clientes.id=compras.cliente_id
-        WHERE clientes.usuario_id=?
+        WHERE clientes.usuario_id=%s
         AND compras.status='ABERTA'
         GROUP BY clientes.id, clientes.nome
         ORDER BY total_divida DESC
@@ -166,15 +165,15 @@ def novo_cliente():
         nome=request.form["nome"]
         telefone=request.form["telefone"]
         
-        import sqlite3
-        conn=sqlite3.connect("banco.db")
+        from database import conectar
+        conn = conectar()
         cursor=conn.cursor()
         usuario_id = session["usuario_id"]
 
         cursor.execute("""
             INSERT INTO clientes
             (nome, telefone, usuario_id)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
             """, (nome, telefone, usuario_id))
         conn.commit()
         conn.close()
@@ -184,15 +183,15 @@ def novo_cliente():
 @app.route("/clientes")
 def clientes():
     busca=request.args.get("busca","")
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
     usuario_id=session["usuario_id"]
     cursor.execute("""
         SELECT*
         FROM clientes
-        WHERE usuario_id=?
-        AND nome LIKE ?
+        WHERE usuario_id=%s
+        AND nome LIKE %s
         """,(usuario_id,f"%{busca}%"))
     clientes=cursor.fetchall()
     clientes_com_total=[]
@@ -201,7 +200,7 @@ def clientes():
         cursor.execute("""
             SELECT SUM(valor)
             FROM compras
-            WHERE cliente_id = ?
+            WHERE cliente_id = %s
             AND status ='ABERTA'
         """,(id_cliente,))
         resultado=cursor.fetchone()
@@ -223,17 +222,16 @@ def nova_compra():
 
     usuario_id = session["usuario_id"]
 
-    import sqlite3
-
-    conn = sqlite3.connect("banco.db")
-    cursor = conn.cursor()
+    from database import conectar
+    conn = conectar()
+    cursor=conn.cursor()
     if "usuario_id" not in session:
         return redirect("/login")
 
     cursor.execute("""
         SELECT id, nome
         FROM clientes
-        WHERE usuario_id = ?
+        WHERE usuario_id = %s
     """, (usuario_id,))
     clientes = cursor.fetchall()
 
@@ -246,8 +244,8 @@ def nova_compra():
         cursor.execute("""
             SELECT id
             FROM clientes
-            WHERE id = ?
-            AND usuario_id = ?
+            WHERE id = %s
+            AND usuario_id = %s
         """, (cliente_id, usuario_id))
 
         cliente = cursor.fetchone()
@@ -259,7 +257,7 @@ def nova_compra():
         cursor.execute("""
             INSERT INTO compras
             (cliente_id, data_compra, valor, status)
-            VALUES (?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s)
         """, (
             cliente_id,
             data_compra,
@@ -284,13 +282,13 @@ def excluir_cliente(id):
     usuario_id=session["usuario_id"]
     if "usuario_id" not in session:
         return redirect("/login")
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
     cursor.execute("""
         DELETE FROM clientes 
-        WHERE id = ?
-        AND usuario_id=?
+        WHERE id = %s
+        AND usuario_id=%s
     """,(id,usuario_id))
     conn.commit()
     conn.close()
@@ -300,15 +298,15 @@ def excluir_cliente(id):
 def detalhes_cliente(id):
     if "usuario_id" not in session:
         return redirect("/login")
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
     usuario_id=session["usuario_id"]
     cursor.execute("""
         SELECT*
         FROM clientes
-        WHERE id = ?
-        AND usuario_id=?
+        WHERE id = %s
+        AND usuario_id=%s
     """,(id,usuario_id))
     
     cliente=cursor.fetchone()
@@ -319,7 +317,7 @@ def detalhes_cliente(id):
     cursor.execute("""
         SELECT*
         FROM compras
-        WHERE cliente_id = ?
+        WHERE cliente_id = %s
     """,(id,))
     
     compras=cursor.fetchall()
@@ -333,10 +331,9 @@ def detalhes_cliente(id):
 @app.route("/pagar/<int:compra_id>")
 def pagar(compra_id):
 
-    import sqlite3
-
-    conn = sqlite3.connect("banco.db")
-    cursor = conn.cursor()
+    from database import conectar
+    conn = conectar()
+    cursor=conn.cursor()
 
     usuario_id = session["usuario_id"]
 
@@ -345,8 +342,8 @@ def pagar(compra_id):
         FROM compras
         JOIN clientes
         ON compras.cliente_id = clientes.id
-        WHERE compras.id = ?
-        AND clientes.usuario_id = ?
+        WHERE compras.id = %s
+        AND clientes.usuario_id = %s
     """,(compra_id, usuario_id))
 
     compra = cursor.fetchone()
@@ -357,8 +354,8 @@ def pagar(compra_id):
 
     cursor.execute("""
         UPDATE compras
-        SET status = ?, data_pagamento = ?
-        WHERE id = ?
+        SET status = %s, data_pagamento = %s
+        WHERE id = %s
     """, (
         "PAGA",
         date.today().isoformat(),
@@ -374,8 +371,8 @@ def pagar(compra_id):
 def editar_cliente(id):
     if "usuario_id" not in session:
         return redirect ("/login")
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
     usuario_id=session["usuario_id"]
     if request.method == "POST":
@@ -384,9 +381,9 @@ def editar_cliente(id):
 
         cursor.execute("""
             UPDATE clientes
-            SET nome = ?, telefone= ?
-            WHERE id= ?
-            AND usuario_id=?
+            SET nome = %s, telefone= %s
+            WHERE id= %s
+            AND usuario_id=%s
         """,(nome,telefone,id,usuario_id))
         conn.commit()
         conn.close()
@@ -394,8 +391,8 @@ def editar_cliente(id):
     cursor.execute("""
         SELECT*
         FROM clientes
-        WHERE id = ?
-        AND usuario_id=?
+        WHERE id = %s
+        AND usuario_id=%s
     """,(id,usuario_id))
 
     cliente=cursor.fetchone()
@@ -410,19 +407,16 @@ def editar_cliente(id):
 
 @app.route("/relatorios")
 def relatorios():
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
     cursor.execute("""
         SELECT id, nome
         FROM clientes
         ORDER BY nome
     """)
-
-    clientes = cursor.fetchall()
-
+    clientes=cursor.fetchall()
     conn.close()
-
     return render_template(
         "relatorios.html",
         clientes=clientes
@@ -430,17 +424,17 @@ def relatorios():
 
 @app.route("/relatorio_mensal")
 def relatorio_mensal():
-    import sqlite3
+    from database import conectar
     mes=request.args.get("mes")
     ano=request.args.get("ano")
 
     filtro = f"{ano}-{int(mes):02d}%"
-    conn=sqlite3.connect("banco.db")
+    conn = conectar()
     cursor=conn.cursor()
     cursor.execute("""
         SELECT data_compra, valor, status
         FROM compras
-        WHERE data_compra LIKE?               
+        WHERE TO_CHAR(data_compra,'YYYY-MM')=%s               
     """,(filtro,))
     compras=cursor.fetchall()
     conn.close()
@@ -453,13 +447,13 @@ def relatorio_mensal():
 @app.route("/relatorio_anual")
 def relatorio_anual():
     ano=request.args.get("ano")
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
     cursor.execute("""
         SELECT data_compra,valor,status
         FROM compras
-        WHERE data_compra LIKE?
+        WHERE TO_CHAR(data_compra,'YYYY-MM')=%s
     """, (f"{ano}%",))
     compras=cursor.fetchall()
 
@@ -474,14 +468,14 @@ def relatorio_anual():
 @app.route("/relatorio_cliente")
 def relatorio_cliente():
     cliente_id=request.args.get("cliente_id")
-    import sqlite3
-    conn=sqlite3.connect("banco.db")
+    from database import conectar
+    conn = conectar()
     cursor=conn.cursor()
 
     cursor.execute("""
         SELECT data_compra,valor,status
         FROM compras
-        WHERE cliente_id=?
+        WHERE cliente_id=%s
     """,(cliente_id,))
 
     compras=cursor.fetchall()
@@ -495,19 +489,19 @@ def relatorio_cliente():
 
 @app.route("/relatorio_mensal_pdf")
 def relatorio_mensal_pdf():
-    import sqlite3
+    from database import conectar
     import io
     mes=request.args.get("mes")
     ano=request.args.get("ano")
 
     filtro=f"{ano}-{int(mes):02d}%"
 
-    conn=sqlite3.connect("banco.db")
+    conn=conectar()
     cursor=conn.cursor()
     cursor.execute("""
         SELECT data_compra, valor, status
         FROM compras
-        WHERE data_compra LIKE ?
+        WHERE TO_CHAR(data_compra,'YYYY-MM')=%s
     """, (filtro,))
 
     compras = cursor.fetchall()
@@ -557,41 +551,27 @@ def relatorio_mensal_pdf():
         mimetype="application/pdf"
     )
 
-import sqlite3
-def criar_tabela_usuario():
-    conn=sqlite3.connect("banco.db")
-    cursor=conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            senha TEXT NOT NULL
-            )     
-        """)
-    conn.commit()
-    conn.close()
-criar_tabela_usuario()
 
 @app.route("/cadastro", methods=["GET","POST"])
 def cadastro():
-    import sqlite3
+    from database import conectar
+    import psycopg2
     if request.method=="POST":
         nome=request.form["nome"]
         email=request.form["email"]
         senha=request.form["senha"]
 
         senha_hash=generate_password_hash(senha)
-        conn=sqlite3.connect("banco.db")
+        conn=conectar()
         cursor=conn.cursor()
         try:
             cursor.execute("""
                 INSERT INTO usuarios (nome,email,senha)
-                VALUES (?,?,?)
-            """,(nome,email,senha_hash))
+                VALUES (%s,%s,%s)
+            """,(nome,email,senha_hash,))
             conn.commit()
-        except sqlite3.IntegrityError:
+        except psycopg2.IntegrityError:
+            conn.rollback()
             conn.close()
             return "Este e-mail ja esta cadastro",
         conn.close()
@@ -600,19 +580,19 @@ def cadastro():
 
 @app.route("/login",methods=["GET","POST"])
 def login():
-    import sqlite3
+    from database import conectar
     if "usuario_id" in session:
         return redirect("/")
     if request.method=="POST":
         email=request.form["email"]
         senha=request.form["senha"]
 
-        conn=sqlite3.connect("banco.db")
+        conn=conectar()
         cursor=conn.cursor()
         cursor.execute("""
             SELECT id, senha
             FROM usuarios
-            WHERE email= ?
+            WHERE email= %s
         """,(email,))
         usuario=cursor.fetchone()
         conn.close()
